@@ -288,6 +288,10 @@ func (f *DeltaFIFO) Close() {
 	f.cond.Broadcast()
 }
 
+func (f *DeltaFIFO) Transformer() TransformFunc {
+	return f.transformer
+}
+
 // KeyOf exposes f's keyFunc, but also detects the key of a Deltas object or
 // DeletedFinalStateUnknown objects.
 func (f *DeltaFIFO) KeyOf(obj interface{}) (string, error) {

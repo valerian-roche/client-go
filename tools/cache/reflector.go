@@ -77,6 +77,12 @@ type ReflectorStore interface {
 	Resync() error
 }
 
+// TransformingStore is an additional interface that can be implemented by the provided store.
+// If it is the case the transformer will be used in temporary stores used within the internals of the reflector.
+type TransformingStore interface {
+	Transformer() TransformFunc
+}
+
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// name identifies this reflector. By default, it will be a file:line if possible.
@@ -726,6 +732,11 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		return false
 	}
 
+	storeOpts := []StoreOption{}
+	if tr, ok := r.store.(TransformingStore); ok {
+		storeOpts = append(storeOpts, WithTransformer(tr.Transformer()))
+	}
+
 	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
 	for {
@@ -737,7 +748,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 
 		resourceVersion = ""
 		lastKnownRV := r.rewatchResourceVersion()
-		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc, storeOpts...)
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
